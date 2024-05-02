@@ -1,7 +1,7 @@
 mod config;
 mod parser;
 
-use std::process::exit;
+use std::{io::Write, process::exit};
 
 use bitcoincore_rpc::RpcApi;
 use clap::Parser;
@@ -75,7 +75,13 @@ fn main() {
         }
     }
 
-    let tweaks_strs: Vec<_> = tweaks.into_iter().map(|pk| pk.to_string()).collect();
-
-    println!("{:#?}", tweaks_strs);
+    print!("[");
+    if let Some((first, rest)) = tweaks.split_first(){
+        print!("\n\t\"{}\"", first);
+        for tweak in rest {
+            print!(",\n\t\"{}\"", tweak);
+        }
+    }
+    print!("\n]");
+    std::io::stdout().flush().unwrap();
 }
