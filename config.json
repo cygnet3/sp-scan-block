@@ -1,0 +1,5 @@
+{
+    "rpc_username": "bitcoin",
+    "rpc_password": "bitcoin",
+    "rpc_url": "127.0.0.1:8332"
+}
