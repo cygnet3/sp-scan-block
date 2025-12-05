@@ -1,4 +1,4 @@
-use bitcoincore_rpc::bitcoin::BlockHash;
+use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -11,4 +11,8 @@ pub struct Args {
     /// Providing block hash
     #[arg(long)]
     pub blkhash: Option<BlockHash>,
+
+    /// Providing txid for singular tx
+    #[arg(long)]
+    pub txid: Option<Txid>,
 }

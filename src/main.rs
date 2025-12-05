@@ -3,7 +3,10 @@ mod parser;
 
 use std::{io::Write, process::exit};
 
-use bitcoincore_rpc::{bitcoin::Transaction, Client, RpcApi};
+use bitcoincore_rpc::{
+    bitcoin::{BlockHash, Transaction, Txid},
+    Client, RpcApi,
+};
 use clap::Parser;
 use silentpayments::{
     secp256k1::PublicKey,
@@ -12,42 +15,53 @@ use silentpayments::{
 
 use crate::{config::get_rpc_client_from_config, parser::Args};
 
+enum ToScan {
+    Block(BlockHash),
+    Tx(Txid),
+}
+
 fn main() {
     let args = Args::parse();
     let client = get_rpc_client_from_config();
 
-    let blk_hash = match (args.blkhash, args.blkheight) {
-        (Some(_), Some(_)) => {
-            println!("specify either block hash or height");
-            exit(1);
-        }
-        (Some(blk_hash), _) => blk_hash,
-        (_, Some(blk_height)) => client.get_block_hash(blk_height).unwrap(),
-        (None, None) => {
-            println!("specify either block hash or height");
+    let toscan = match (args.blkhash, args.blkheight, args.txid) {
+        (Some(blkhash), None, None) => ToScan::Block(blkhash),
+        (None, Some(blkheight), None) => ToScan::Block(client.get_block_hash(blkheight).unwrap()),
+        (None, None, Some(txid)) => ToScan::Tx(txid),
+        _ => {
+            println!("specify either block hash, block height or a txid");
             exit(1);
         }
     };
 
-    let block = client.get_block(&blk_hash).unwrap();
+    match toscan {
+        ToScan::Block(blk_hash) => {
+            let block = client.get_block(&blk_hash).unwrap();
 
-    let mut tweaks = Vec::new();
+            let mut tweaks = Vec::new();
 
-    for tx in block.txdata {
-        if let Some(tweak) = tx_tweak(&client, tx) {
-            tweaks.push(tweak);
+            for tx in block.txdata {
+                if let Some(tweak) = tx_tweak(&client, tx) {
+                    tweaks.push(tweak);
+                }
+            }
+
+            print!("[");
+            if let Some((first, rest)) = tweaks.split_first() {
+                print!("\n\t\"{}\"", first);
+                for tweak in rest {
+                    print!(",\n\t\"{}\"", tweak);
+                }
+            }
+            print!("\n]");
+            std::io::stdout().flush().unwrap();
+        }
+        ToScan::Tx(txid) => {
+            let tx = client.get_raw_transaction(&txid, None).unwrap();
+
+            println!("{}", tx_tweak(&client, tx).unwrap());
         }
     }
-
-    print!("[");
-    if let Some((first, rest)) = tweaks.split_first() {
-        print!("\n\t\"{}\"", first);
-        for tweak in rest {
-            print!(",\n\t\"{}\"", tweak);
-        }
-    }
-    print!("\n]");
-    std::io::stdout().flush().unwrap();
 }
 
 fn tx_tweak(client: &Client, tx: Transaction) -> Option<PublicKey> {
